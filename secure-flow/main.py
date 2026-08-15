@@ -11,14 +11,17 @@ import joblib
 import numpy as np
 import pandas as pd
 import shap
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from sklearn.ensemble import RandomForestClassifier
+from sqlalchemy.orm import Session
 
-# In-memory holders for all ML assets loaded once on startup.
+import database
+import models
+import schemas
+from database import redis_client
+
 ml_assets: Dict[str, Any] = {}
 
-# Human-readable mapping used to explain the top fraud drivers.
 REASON_MAP = {
     "velocity_1h": "Unusual burst of transfers in the last hour",
     "new_beneficiary": "First-time transfer to an unverified recipient",
@@ -28,34 +31,8 @@ REASON_MAP = {
 }
 
 FEATURES = list(REASON_MAP.keys())
-
 MODEL_PATH = Path(os.getenv("SECUREFLOW_MODEL_PATH", Path(__file__).resolve().parent / "artifacts" / "fraud_model.joblib"))
 LOG_PATH = Path(os.getenv("SECUREFLOW_LOG_PATH", Path(__file__).resolve().parent / "artifacts" / "xai_events.jsonl"))
-
-
-class TransactionTelemetry(BaseModel):
-    transaction_id: str = Field(..., min_length=1)
-    velocity_1h: float = Field(..., ge=0.0)
-    new_beneficiary: int = Field(..., ge=0, le=1)
-    location_distance_km: float = Field(..., ge=0.0)
-    typing_cadence_variance: float = Field(..., ge=0.0)
-    active_screenshare: int = Field(..., ge=0, le=1)
-
-
-class XaiDetail(BaseModel):
-    feature: str
-    reason: str
-    shap_value: float
-
-
-class AnalyzeTransactionResponse(BaseModel):
-    transaction_id: str
-    risk_score: float
-    risk_tier: str
-    action_required: str
-    xai_summary: str
-    xai_details: List[XaiDetail]
-    model_version: str
 
 
 def _train_dummy_model() -> RandomForestClassifier:
@@ -89,21 +66,13 @@ def _load_model_bundle() -> Dict[str, Any]:
                 explainer = payload.get("explainer")
                 feature_names = payload.get("feature_names") or FEATURES
                 if model is not None and explainer is not None:
-                    return {
-                        "model": model,
-                        "explainer": explainer,
-                        "feature_names": feature_names,
-                    }
+                    return {"model": model, "explainer": explainer, "feature_names": feature_names}
         except Exception:
             pass
 
     model = _train_dummy_model()
     explainer = shap.TreeExplainer(model)
-    return {
-        "model": model,
-        "explainer": explainer,
-        "feature_names": FEATURES,
-    }
+    return {"model": model, "explainer": explainer, "feature_names": FEATURES}
 
 
 def _extract_feature_impacts(explainer: Any, feature_df: pd.DataFrame) -> np.ndarray:
@@ -127,7 +96,6 @@ def _extract_feature_impacts(explainer: Any, feature_df: pd.DataFrame) -> np.nda
 
 def _log_xai_event(event: Dict[str, Any]) -> None:
     try:
-        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(LOG_PATH, "a", encoding="utf-8") as log_file:
             log_file.write(json.dumps(event, default=str) + "\n")
     except Exception:
@@ -146,8 +114,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="SecureFlow Fraud & XAI Engine",
-    version="1.2.0",
-    description="Fraud risk evaluation with SHAP-based explainability and model lifecycle support.",
+    version="1.3.0",
+    description="Fraud risk evaluation with SHAP-based explainability and payment safeguards.",
     lifespan=lifespan,
 )
 
@@ -158,11 +126,12 @@ async def healthcheck() -> dict:
         "status": "ok",
         "model_loaded": "model" in ml_assets,
         "version": app.version,
+        "redis_connected": redis_client is not None,
     }
 
 
-@app.post("/api/v1/analyze-transaction", response_model=AnalyzeTransactionResponse)
-async def analyze_transaction(data: TransactionTelemetry):
+@app.post("/api/v1/analyze-transaction", response_model=schemas.AnalyzeTransactionResponse)
+async def analyze_transaction(data: schemas.TransactionTelemetry):
     try:
         model = ml_assets["model"]
         explainer = ml_assets["explainer"]
@@ -175,14 +144,14 @@ async def analyze_transaction(data: TransactionTelemetry):
         impacts = _extract_feature_impacts(explainer, input_df)
 
         ordered_indices = np.argsort(impacts)[::-1]
-        top_reasons: List[XaiDetail] = []
+        top_reasons: List[schemas.XaiDetail] = []
 
         for idx in ordered_indices:
             if impacts[idx] <= 0:
                 continue
             feature_name = features[idx]
             top_reasons.append(
-                XaiDetail(
+                schemas.XaiDetail(
                     feature=feature_name,
                     reason=REASON_MAP.get(feature_name, feature_name),
                     shap_value=float(impacts[idx]),
@@ -201,7 +170,7 @@ async def analyze_transaction(data: TransactionTelemetry):
             tier = "LOW"
             action = "PROCEED_SEAMLESS"
 
-        response = AnalyzeTransactionResponse(
+        response = schemas.AnalyzeTransactionResponse(
             transaction_id=data.transaction_id,
             risk_score=round(risk_proba, 3),
             risk_tier=tier,
@@ -227,6 +196,64 @@ async def analyze_transaction(data: TransactionTelemetry):
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Fraud analysis failed: {exc}") from exc
+
+
+@app.post(
+    "/v1/payments/evaluate",
+    response_model=schemas.EvaluateResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def evaluate_payment(
+    tx: schemas.TransactionRequest,
+    x_device_fingerprint: str = Header(..., description="Hardware hash unique to device"),
+    db: Session = Depends(database.get_db),
+):
+    current_time = datetime.now(timezone.utc).timestamp()
+
+    user = db.query(models.UserAccount).filter(models.UserAccount.user_id == tx.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    if user.is_frozen:
+        raise HTTPException(status_code=403, detail="Account is strictly locked due to security anomalies.")
+
+    if user.trusted_device_fingerprint and user.trusted_device_fingerprint != x_device_fingerprint:
+        return schemas.EvaluateResponse(
+            status="CHALLENGE_REQUIRED",
+            action_required="STEP_UP_MFA",
+            reason="Unrecognized hardware signature detected for high-value transfer.",
+        )
+
+    if redis_client is not None:
+        velocity_key = f"user:{tx.user_id}:tx_velocity"
+        redis_client.zadd(velocity_key, {f"{current_time}:{tx.recipient_account}": current_time})
+        redis_client.zremrangebyscore(velocity_key, "-inf", current_time - 600)
+        recent_tx_count = redis_client.zcard(velocity_key)
+
+        if recent_tx_count > 3 or (tx.is_on_active_call and tx.screen_sharing_active):
+            tx_id = f"tx_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+            quarantine_key = f"quarantine:{tx_id}"
+
+            quarantine_data = schemas.QuarantinedTransaction(
+                transaction_id=tx_id,
+                user_id=tx.user_id,
+                amount=tx.amount,
+                recipient_account=tx.recipient_account,
+                timestamp=current_time,
+            )
+            redis_client.setex(quarantine_key, 900, json.dumps(quarantine_data.model_dump()))
+
+            return schemas.EvaluateResponse(
+                status="QUARANTINED",
+                action_required="TRIGGER_SHIELD_UI",
+                reason="High transaction velocity or severe coercion behaviors flagged.",
+                remaining_seconds=900,
+            )
+
+    return schemas.EvaluateResponse(
+        status="APPROVED",
+        reason="Transaction metrics standard. Processing payload seamlessly.",
+    )
 
 
 if __name__ == "__main__":
