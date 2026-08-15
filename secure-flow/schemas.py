@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import datetime,timezone
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,6 +16,7 @@ class TransactionRequest(BaseModel):
     
     # country geo location
     current_country: str = Field(..., min_length=2, max_length=2, examples=["IN"])
+
 
 
 class QuarantinedTransaction(BaseModel):
@@ -34,6 +36,8 @@ class EvaluateResponse(BaseModel):
     action_required: Optional[str] = None
     reason: Optional[str] = None
     remaining_seconds: Optional[int] = None
+    current_time = datetime.now(timezone.utc).timestamp()
+
 
 
 class TransactionTelemetry(BaseModel):

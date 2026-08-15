@@ -5,7 +5,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 import joblib
 import numpy as np
@@ -208,13 +208,15 @@ async def evaluate_payment(
     x_device_fingerprint: str = Header(..., description="Hardware hash unique to device"),
     db: Session = Depends(database.get_db),
 ):
+    # 1. Ensure current_time is calculated at the very top
     current_time = datetime.now(timezone.utc).timestamp()
 
+    # 2. Database validation layer
     user = db.query(models.UserAccount).filter(models.UserAccount.user_id == tx.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User account not found.")
 
-    if user.is_frozen:
+    if cast(bool,user.is_frozen):
         raise HTTPException(status_code=403, detail="Account is strictly locked due to security anomalies.")
 
     if user.trusted_device_fingerprint and user.trusted_device_fingerprint != x_device_fingerprint:
@@ -224,35 +226,88 @@ async def evaluate_payment(
             reason="Unrecognized hardware signature detected for high-value transfer.",
         )
 
+    # Initialize tracking defaults in case Redis is offline
+    simulated_distance_km = 0.0
+    recent_tx_count = 0.0  # <--- CRITICAL: Defines a fallback value so it's never undefined!
+
+    # 3. Secure Redis In-Flight Calculations Block
     if redis_client is not None:
+        # A. TRACK VELOCITY ENGINE (Defines recent_tx_count)
         velocity_key = f"user:{tx.user_id}:tx_velocity"
         redis_client.zadd(velocity_key, {f"{current_time}:{tx.recipient_account}": current_time})
-        redis_client.zremrangebyscore(velocity_key, "-inf", current_time - 600)
-        recent_tx_count = redis_client.zcard(velocity_key)
+        redis_client.zremrangebyscore(velocity_key, "-inf", current_time - 3600)  
+        recent_tx_count = float(redis_client.zcard(velocity_key))
 
-        if recent_tx_count > 3 or (tx.is_on_active_call and tx.screen_sharing_active):
-            tx_id = f"tx_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        # B. TRACK COUNTRY GEOLOCATION ANOMALY
+        geo_key = f"user:{tx.user_id}:last_country"
+        last_country_data = redis_client.get(geo_key)
+        
+        if last_country_data:
+            historical_record = json.loads(str(last_country_data))
+            if historical_record["country"] != tx.current_country:
+                time_diff_hours = (current_time - historical_record["timestamp"]) / 3600.0
+                if time_diff_hours < 12.0:
+                    simulated_distance_km = 999.0
+
+        # Update spatial footprint history
+        redis_client.set(geo_key, json.dumps({
+            "country": tx.current_country, 
+            "timestamp": current_time
+        }))
+
+        # 4. INGEST EVERYTHING INTO ML & SHAP DATAFRAME
+        model = ml_assets.get("model")
+        explainer = ml_assets.get("explainer")
+        features = ml_assets.get("feature_names") or FEATURES
+
+        tx_id = f"tx_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+
+        ml_input_data = {
+            "velocity_1h": [recent_tx_count],                  # Now perfectly visible and safe
+            "new_beneficiary": [1 if recent_tx_count <= 1 else 0],  
+            "location_distance_km": [simulated_distance_km],         
+            "typing_cadence_variance": [float(tx.typing_hesitation_ms)],
+            "active_screenshare": [1 if tx.screen_sharing_active else 0]
+        }
+        input_df = pd.DataFrame(ml_input_data)
+
+        # Run model scoring metrics
+        risk_proba = float(model.predict_proba(input_df)[0][1]) if model else 0.0
+        impacts = _extract_feature_impacts(explainer, input_df) if explainer else np.zeros(len(features))
+
+        # 5. Pipeline Circuit Breaker Operations
+        if risk_proba >= 0.70 or (tx.is_on_active_call and tx.screen_sharing_active) or simulated_distance_km > 0:
             quarantine_key = f"quarantine:{tx_id}"
 
-            quarantine_data = schemas.QuarantinedTransaction(
+            quarantine_payload = schemas.QuarantinedTransaction(
                 transaction_id=tx_id,
                 user_id=tx.user_id,
                 amount=tx.amount,
                 recipient_account=tx.recipient_account,
-                timestamp=current_time,
+                timestamp=current_time
             )
-            redis_client.setex(quarantine_key, 900, json.dumps(quarantine_data.model_dump()))
+            
+            # Lock the transfer inside your Redis Quarantine Ledger for 15 minutes
+            redis_client.setex(quarantine_key, 900, quarantine_payload.model_dump_json())
+
+            # Generate explainable text metrics using SHAP
+            ordered_indices = np.argsort(impacts)[::-1]
+            flagged_reasons = [
+                REASON_MAP.get(features[i], features[i]) 
+                for i in ordered_indices if impacts[i] > 0
+            ]
+            primary_reason = flagged_reasons[0] if flagged_reasons else "High risk indicators flagged"
 
             return schemas.EvaluateResponse(
                 status="QUARANTINED",
                 action_required="TRIGGER_SHIELD_UI",
-                reason="High transaction velocity or severe coercion behaviors flagged.",
-                remaining_seconds=900,
+                reason=f"Safety Lock Activated: {primary_reason}.",
+                remaining_seconds=900
             )
 
     return schemas.EvaluateResponse(
         status="APPROVED",
-        reason="Transaction metrics standard. Processing payload seamlessly.",
+        reason="Transaction parameters standard. Payout authorized."
     )
 
 
