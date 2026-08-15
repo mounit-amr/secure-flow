@@ -9,7 +9,7 @@ from fastapi import FastAPI, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db, redis_client
-from models
+import models
 import schemas
 
 app = FastAPI(title="In-Flight Fraud Shield Engine")
@@ -42,7 +42,7 @@ async def evaluate_payment(
             reason="Unrecognized hardware signature detected for high-value transfer."
         )
 
-    TRANSACTION VELOCITY (SLIDING WINDOW) 
+   # TRANSACTION VELOCITY (SLIDING WINDOW) 
     velocity_key = f"user:{tx.user_id}:tx_velocity"
     
     # Push the current attempt into the user's continuous Redis timeline
@@ -82,3 +82,25 @@ async def evaluate_payment(
         status="APPROVED",
         reason="Transaction metrics standard. Processing payload seamlessly."
     )
+
+
+    
+geo_history_key = f"user:{tx.user_id}:last_country"
+last_country_data = redis_client.get(geo_history_key)
+    
+country_anomaly_triggered = False
+    
+if last_country_data:
+    historical_record = json.loads(last_country_data)
+        
+        # Simple text match: Did the country change in less than 12 hours?
+    if historical_record["country"] != tx.current_country:
+        time_diff_hours = (current_time - historical_record["timestamp"]) / 3600.0
+        if time_diff_hours < 12.0:
+            country_anomaly_triggered = True
+
+    # Cache current country for the next check
+redis_client.set(geo_history_key, json.dumps({
+    "country": tx.current_country,
+    "timestamp": current_time
+}))
