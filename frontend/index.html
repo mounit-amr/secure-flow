@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Simulated Payment Gateway</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <div class="nav-bar">
+    <a href="index.html" class="nav-link active">💳 Payment Terminal</a>
+    <a href="transactions.html" target="_blank" class="nav-link">📡 Live Monitor (New Tab)</a>
+  </div>
+
+  <div class="container">
+    <div class="banner">
+      DEMO PAYMENT GATEWAY — NO REAL MONEY
+    </div>
+
+    <!-- MAIN PAYMENT GATEWAY FORM -->
+    <div class="card">
+      <div class="card-title">
+        <span>💳 Secure Payment Terminal</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Step 1 of 3</span>
+      </div>
+
+      <form id="paymentForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Sender Account</label>
+            <input type="text" id="senderAccount" required />
+          </div>
+          <div class="form-group">
+            <label>Sender Name</label>
+            <input type="text" id="senderName" required />
+          </div>
+          <div class="form-group">
+            <label>Receiver Account</label>
+            <input type="text" id="receiverAccount" required />
+          </div>
+          <div class="form-group">
+            <label>Receiver Name</label>
+            <input type="text" id="receiverName" required />
+          </div>
+          <div class="form-group">
+            <label>Amount</label>
+            <input type="number" id="amount" step="0.01" required />
+          </div>
+          <div class="form-group">
+            <label>Currency</label>
+            <select id="currency">
+              <option value="INR">INR (₹)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Sender Country</label>
+            <input type="text" id="senderCountry" required />
+          </div>
+          <div class="form-group">
+            <label>Receiver Country</label>
+            <input type="text" id="receiverCountry" required />
+          </div>
+          <div class="form-group">
+            <label>Device ID</label>
+            <input type="text" id="deviceId" required />
+          </div>
+          <div class="form-group">
+            <label>Session ID</label>
+            <input type="text" id="sessionId" required />
+          </div>
+        </div>
+
+        <button type="submit" class="btn" style="margin-top: 16px;">Review Payment</button>
+      </form>
+    </div>
+
+    <!-- DEMO QUICK PRESET CONTROLS -->
+    <div class="card">
+      <div class="card-title">
+        <span>⚡ Quick Transaction Generators</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">Populates Form Without Bias</span>
+      </div>
+      <div class="btn-demo-panel">
+        <button class="btn-secondary" onclick="setPreset('normal')">Normal Domestic</button>
+        <button class="btn-secondary" onclick="setPreset('large')">Large Domestic</button>
+        <button class="btn-secondary" onclick="setPreset('international')">International Cross-Border</button>
+        <button class="btn-secondary" onclick="generateBatch(5)">⚡ Fire 5 Rapid Txns</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: REVIEW & OTP POPUP MODAL -->
+  <div id="otpModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3 style="margin-bottom: 12px;">Confirm & Enter Demo OTP</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">
+        Transferring <strong id="modalAmount" style="color: var(--text-main);"></strong> to 
+        <strong id="modalReceiver" style="color: var(--text-main);"></strong>
+      </p>
+
+      <div class="form-group" style="text-align: left;">
+        <label>Enter Demo OTP (Use: 123456)</label>
+        <input type="text" id="otpInput" value="123456" style="text-align: center; font-size: 1.25rem; letter-spacing: 4px;" />
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button class="btn-secondary" style="flex: 1;" onclick="closeModal()">Cancel</button>
+        <button class="btn" style="flex: 1;" onclick="submitPayment()">Pay Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROCESSING MODAL -->
+  <div id="processingModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3>Processing Transaction...</h3>
+      <div class="spinner"></div>
+      <p style="color: var(--text-muted); font-size: 0.85rem;">Communicating with ledger & emitting event...</p>
+    </div>
+  </div>
+
+  <!-- SUCCESS MODAL -->
+  <div id="successModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h2 style="color: var(--success); margin-bottom: 10px;">✔ Payment Successful</h2>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px;">
+        Transaction ID: <span id="successTxnId" style="color: var(--text-main); font-family: monospace; font-weight: bold;"></span>
+      </p>
+      <button class="btn" onclick="resetForm()">Done</button>
+    </div>
+  </div>
+
+  <script src="js/payment.js"></script>
+</body>
+</html>

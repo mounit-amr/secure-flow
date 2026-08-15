@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Raw Transaction Stream Monitor</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <div class="nav-bar" style="max-width: 1200px;">
+    <a href="index.html" class="nav-link">💳 Payment Terminal</a>
+    <a href="transactions.html" class="nav-link active">📡 Live Monitor</a>
+  </div>
+
+  <div class="container" style="max-width: 1200px;">
+    <div class="banner">
+      NEUTRAL TRANSACTION MONITOR — NO RISK SCORING APPLIED
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>📡 Live Transaction Ledger (WebSocket Feed)</span>
+        <span id="wsStatus" class="badge" style="background: rgba(239,68,68,0.2); color: #ef4444;">Connecting...</span>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Txn ID</th>
+              <th>Timestamp (UTC)</th>
+              <th>Sender</th>
+              <th>Receiver</th>
+              <th>Amount</th>
+              <th>Route</th>
+              <th>Device ID</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="transactionBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/transactions.js"></script>
+</body>
+</html>
