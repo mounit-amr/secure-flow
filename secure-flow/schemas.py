@@ -36,7 +36,6 @@ class EvaluateResponse(BaseModel):
     action_required: Optional[str] = None
     reason: Optional[str] = None
     remaining_seconds: Optional[int] = None
-    current_time = datetime.now(timezone.utc).timestamp()
 
 
 

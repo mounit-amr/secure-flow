@@ -211,6 +211,7 @@ async def evaluate_payment(
     # 1. Ensure current_time is calculated at the very top
     current_time = datetime.now(timezone.utc).timestamp()
 
+
     # 2. Database validation layer
     user = db.query(models.UserAccount).filter(models.UserAccount.user_id == tx.user_id).first()
     if not user:
@@ -219,7 +220,7 @@ async def evaluate_payment(
     if cast(bool,user.is_frozen):
         raise HTTPException(status_code=403, detail="Account is strictly locked due to security anomalies.")
 
-    if user.trusted_device_fingerprint and user.trusted_device_fingerprint != x_device_fingerprint:
+    if user.trusted_device_fingerprint and duser.trusted_device_fingerprint != x_device_fingerprint:
         return schemas.EvaluateResponse(
             status="CHALLENGE_REQUIRED",
             action_required="STEP_UP_MFA",
