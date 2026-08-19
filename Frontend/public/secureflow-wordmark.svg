@@ -1,0 +1,19 @@
+<svg viewBox="0 0 560 140" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(10,10) scale(0.6)">
+    <path d="M100 14 L172 42 V96 C172 146 142 182 100 196 C58 182 28 146 28 96 V42 Z" fill="#13294B"/>
+    <path d="M100 14 L172 42 V96 C172 146 142 182 100 196 Z" fill="#1E56A0" opacity="0.32"/>
+    <path d="M62 128 Q84 116 96 104" fill="none" stroke="#EAF1FF" stroke-width="6" stroke-linecap="round"/>
+    <path d="M104 96 Q116 84 138 68" fill="none" stroke="#EAF1FF" stroke-width="6" stroke-linecap="round" stroke-dasharray="1 11" opacity="0.5"/>
+    <circle cx="62" cy="128" r="9" fill="#EAF1FF"/>
+    <circle cx="138" cy="68" r="9" fill="#EAF1FF" opacity="0.5"/>
+    <g transform="translate(100,100) rotate(45)">
+      <rect x="-13" y="-13" width="26" height="26" rx="5" fill="#00A9C7"/>
+    </g>
+    <g transform="translate(100,100) rotate(45)">
+      <rect x="-6" y="-6.5" width="3.6" height="13" rx="1.4" fill="#062B33"/>
+      <rect x="2.4" y="-6.5" width="3.6" height="13" rx="1.4" fill="#062B33"/>
+    </g>
+  </g>
+  <text x="146" y="63" font-family="cursive" font-size="42" font-weight="700" fill="#13294B">Secure<tspan fill="#00A9C7">Flow</tspan></text>
+  <text x="146" y="90" font-family="'Inter', 'Segoe UI', sans-serif" font-size="15" font-weight="500" letter-spacing="1.5" fill="#51607A">FRAUD PREVENTED. NOT JUST DETECTED.</text>
+</svg>
