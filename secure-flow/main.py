@@ -19,6 +19,18 @@ import database
 import models
 import schemas
 from database import redis_client
+import sys
+import os
+
+# --- PyInstaller Windowed Mode Fix ---
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
+# --------------------------------------
+
+from fastapi import FastAPI
+# ... your other imports (schemas, models, database, etc.)
 
 ml_assets: Dict[str, Any] = {}
 
@@ -220,7 +232,7 @@ async def evaluate_payment(
     if cast(bool,user.is_frozen):
         raise HTTPException(status_code=403, detail="Account is strictly locked due to security anomalies.")
 
-    if user.trusted_device_fingerprint and duser.trusted_device_fingerprint != x_device_fingerprint:
+    if user.trusted_device_fingerprint and user.trusted_device_fingerprint != x_device_fingerprint:
         return schemas.EvaluateResponse(
             status="CHALLENGE_REQUIRED",
             action_required="STEP_UP_MFA",
@@ -313,6 +325,17 @@ async def evaluate_payment(
 
 
 if __name__ == "__main__":
+    import threading
     import uvicorn
+    from ui import FraudDetectionApp
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # 1. Start the FastAPI backend on port 8001
+    server_thread = threading.Thread(
+        target=lambda: uvicorn.run(app, host="127.0.0.1", port=8001, log_level="info", use_colors=False),
+        daemon=True
+    )
+    server_thread.start()
+
+    # 2. Launch the desktop GUI window
+    app_gui = FraudDetectionApp()
+    app_gui.mainloop()
