@@ -3,3 +3,8 @@ dist/
 build/
 *.spec
 __pycache__/
+
+dist/
+build/
+*.spec
+__pycache__/
