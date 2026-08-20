@@ -78,8 +78,8 @@ def seed_demo_data() -> None:
         db.commit()
 
         demo_accounts = [
-            ("user_1", "acc_1a", "HDFC Salary", "Bank", "4821", 8450.5, "🏦", "4821"),
-            ("user_2", "acc_2a", "Ved Wallet", "Wallet", "9033", 5200.0, "💳", "9033"),
+            ("user_1", "acc_1a", "HDFC Salary", "Bank", "4821", 8450.5, "🏦", "1234"),
+            ("user_2", "acc_2a", "Ved Wallet", "Wallet", "9033", 5200.0, "💳", "1234"),
         ]
         for user_id, account_id, name, account_type, last4, balance, icon, pin in demo_accounts:
             if not db.query(Account).filter(Account.id == account_id).first():
@@ -98,6 +98,12 @@ def seed_demo_data() -> None:
                         "securityPin": pin,
                     },
                 )
+
+
+        # Ensure every account has default security PIN 1234 (users can change later in Settings)
+        for acc in db.query(Account).all():
+            acc.security_pin = "1234"
+        db.commit()
 
         demo_transactions = [
             {

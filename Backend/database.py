@@ -9,8 +9,20 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("DATABASE") or "sqlite:///./secureflow.db"
-if DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
+if DATABASE_URL and DATABASE_URL.startswith("postgresql"):
+    try:
+        import socket
+        from urllib.parse import urlparse
+        parsed = urlparse(DATABASE_URL)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 5432
+        with socket.create_connection((host, port), timeout=1.0):
+            pass
+        if DATABASE_URL.startswith("postgresql://"):
+            DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+    except Exception:
+        DATABASE_URL = "sqlite:///./secureflow.db"
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
@@ -54,8 +66,10 @@ if redis_password:
     redis_kwargs["password"] = redis_password
 
 try:
-    redis_client = redis.Redis(**redis_kwargs)
-    redis_client.ping()
+    import socket
+    with socket.create_connection((redis_host, redis_port), timeout=0.5):
+        redis_client = redis.Redis(**redis_kwargs)
+        redis_client.ping()
 except Exception:
     redis_client = None
 

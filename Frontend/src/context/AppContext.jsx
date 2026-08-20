@@ -310,9 +310,12 @@ export function AppProvider({ children }) {
         // Backend offline or wrong password — try local demo accounts
         const local = loginLocal(email, password);
         if (local.ok) return local;
+        const msg = String(error.message || "");
         return {
           ok: false,
-          error: error.message || "Invalid credentials",
+          error: msg.includes("Failed to fetch")
+            ? "SecureFlow backend server is unavailable. Ensure the backend server is running on http://localhost:8000."
+            : error.message || "Invalid credentials",
         };
       }
     },

@@ -48,7 +48,7 @@ export const mockAccountsByUser = {
       balance: 8450.5,
       status: "active",
       icon: "🏦",
-      securityPin: "4821",
+      securityPin: "1234",
     },
   ],
   user_2: [
@@ -60,7 +60,7 @@ export const mockAccountsByUser = {
       balance: 5200.0,
       status: "active",
       icon: "💳",
-      securityPin: "9033",
+      securityPin: "1234",
     },
   ],
 };

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
+import Brand from "../components/Brand";
 
 export default function Login() {
   const [step, setStep] = useState("credentials");
@@ -72,23 +73,20 @@ export default function Login() {
 
   return (
     <div
+      className="auth-page"
       style={{
         minHeight: "100vh",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 20,
-        background: "transparent",
+        background: "linear-gradient(180deg, #0A1330 0%, #0F1B3D 100%)",
       }}
     >
       <div style={{ width: "100%", maxWidth: 420 }}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <Link to="/" style={{ display: "inline-block" }}>
-            <img
-              src="/secureflow-wordmark.svg"
-              alt="SecureFlow"
-              style={{ height: 56, width: "auto", maxWidth: "100%" }}
-            />
+          <Link to="/" style={{ display: "inline-block", textDecoration: "none" }}>
+            <Brand variant="lockup-dark" size={48} wordSize={28} />
           </Link>
           <p
             style={{

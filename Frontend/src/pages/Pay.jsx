@@ -212,31 +212,40 @@ export default function Pay() {
       >
         <Navbar variant="app" showBack />
         <div className="container" style={{ paddingTop: 28, maxWidth: 480 }}>
-          <h1
+          <div
+            className="card"
             style={{
-              fontSize: "1.5rem",
-              fontWeight: 800,
-              marginBottom: 6,
-              fontFamily: "var(--font-display)",
+              textAlign: "center",
+              marginBottom: 16,
+              padding: "20px 16px",
             }}
           >
-            Pay
-          </h1>
-          <p
-            style={{
-              color: "var(--text-secondary)",
-              fontSize: "0.9rem",
-              marginBottom: 20,
-            }}
-          >
-            Balance{" "}
-            <strong style={{ color: "var(--trust-blue)" }}>
-              {(user?.balance || 0).toLocaleString("en-IN", {
-                style: "currency",
-                currency: "INR",
-              })}
-            </strong>
-          </p>
+            <h1
+              style={{
+                fontSize: "1.5rem",
+                fontWeight: 800,
+                marginBottom: 6,
+                fontFamily: "var(--font-display)",
+              }}
+            >
+              Pay
+            </h1>
+            <p
+              style={{
+                color: "var(--text-secondary)",
+                fontSize: "0.9rem",
+                margin: 0,
+              }}
+            >
+              Balance{" "}
+              <strong style={{ color: "var(--trust-blue)" }}>
+                {(user?.balance || 0).toLocaleString("en-IN", {
+                  style: "currency",
+                  currency: "INR",
+                })}
+              </strong>
+            </p>
+          </div>
 
           <div className="card">
             <div className="form-group">

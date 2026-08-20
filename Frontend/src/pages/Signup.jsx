@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useApp } from "../context/AppContext";
+import { useApp } from "../context/AppContext"
+import Brand from "../components/Brand";
 
 export default function Signup() {
   const [step, setStep] = useState(1); // 1: details, 2: otp, 3: done
@@ -86,6 +87,7 @@ export default function Signup() {
 
   return (
     <div
+      className="auth-page"
       style={{
         minHeight: "100vh",
         display: "flex",
@@ -96,12 +98,8 @@ export default function Signup() {
     >
       <div style={{ width: "100%", maxWidth: 420 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <Link to="/" style={{ display: "inline-block" }}>
-            <img
-              src="/secureflow-wordmark.svg"
-              alt="SecureFlow"
-              style={{ height: 56, width: "auto", maxWidth: "100%" }}
-            />
+          <Link to="/" style={{ display: "inline-block", textDecoration: "none" }}>
+            <Brand variant="lockup-dark" size={48} wordSize={28} />
           </Link>
           <p style={{ color: "var(--text-secondary)", marginTop: 8 }}>
             {step === 1 && "Create your account"}

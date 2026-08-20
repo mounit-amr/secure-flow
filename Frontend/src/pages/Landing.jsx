@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import Brand from '../components/Brand'
 import { features, howItWorks, bankLogos } from '../data/mockData'
 
 function useReveal() {
@@ -30,9 +31,9 @@ export default function Landing() {
         minHeight: '100vh', paddingTop: 72,
         display: 'flex', alignItems: 'center',
         background: `
-          radial-gradient(ellipse 70% 50% at 20% 40%, rgba(0,229,255,0.07), transparent),
-          radial-gradient(ellipse 50% 40% at 80% 20%, rgba(255,45,85,0.06), transparent),
-          var(--bg)
+          radial-gradient(ellipse 70% 50% at 20% 40%, rgba(0,229,255,0.10), transparent),
+          radial-gradient(ellipse 50% 40% at 80% 20%, rgba(255,45,85,0.08), transparent),
+          linear-gradient(180deg, #0A1330 0%, #0F1B3D 100%)
         `,
         position: 'relative', overflow: 'hidden',
       }}>
@@ -65,16 +66,17 @@ export default function Landing() {
             <h1 style={{
               fontSize: 'clamp(2.5rem, 5.5vw, 3.8rem)', fontWeight: 800,
               lineHeight: 1.08, letterSpacing: '-0.03em', marginBottom: 20,
+              color: '#FFFFFF',
             }}>
               Defeat the<br />
               <span style={{
-                background: 'linear-gradient(135deg, #00e5ff, #7c5cfc)',
+                background: 'linear-gradient(135deg, #00B4D8, #2952CC)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               }}>First-Hour Cliff</span>
             </h1>
 
             <p style={{
-              fontSize: '1.15rem', lineHeight: 1.7, color: 'var(--text-secondary)',
+              fontSize: '1.15rem', lineHeight: 1.7, color: 'rgba(238,241,252,0.72)',
               marginBottom: 32, maxWidth: 500,
             }}>
               Most identity & fraud damage happens in the first 60 minutes of a breach.
@@ -83,7 +85,7 @@ export default function Landing() {
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 48 }}>
               <Link to="/signup" className="btn btn-primary btn-lg">Lock Your Accounts Now</Link>
-              <a href="#how-it-works" className="btn btn-outline btn-lg">See How It Works</a>
+              <a href="#how-it-works" className="btn btn-outline btn-lg" style={{ borderColor: 'rgba(255,255,255,0.35)', color: '#EEF1FC', background: 'rgba(255,255,255,0.08)' }}>See How It Works</a>
             </div>
 
             <div style={{ display: 'flex', gap: 36 }} className="stagger">
@@ -308,6 +310,10 @@ export default function Landing() {
 
       <footer style={{ borderTop: '1px solid var(--border)', padding: '36px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
         <div className="container">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 }}>
+            <Brand variant="icon-dark" size={28} />
+            <Brand variant="wordmark-dark" wordSize={18} />
+          </div>
           © 2026 SecureFlow. Built to defeat the first-hour cliff.
         </div>
       </footer>

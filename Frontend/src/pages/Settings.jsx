@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 
@@ -14,6 +14,18 @@ export default function Settings() {
     updateAccountPin,
   } = useApp();
   const navigate = useNavigate();
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      document.querySelectorAll(".settings-shell .ripple-target, .settings-block.ripple-target").forEach((target) => {
+        const rect = target.getBoundingClientRect();
+        target.style.setProperty("--rx", `${e.clientX - rect.left}px`);
+        target.style.setProperty("--ry", `${e.clientY - rect.top}px`);
+      });
+    };
+    document.addEventListener("mousemove", handleMouseMove);
+    return () => document.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
   const [editField, setEditField] = useState(null); // name | email | phone | null
   const [editValue, setEditValue] = useState("");
   const [otpStep, setOtpStep] = useState(false);
@@ -164,18 +176,21 @@ export default function Settings() {
         </div>
 
         <div
-          className="modal animate-in"
+          className="modal animate-in settings-shell"
           style={{
             maxWidth: 640,
             width: "100%",
             marginBottom: 24,
             maxHeight: "calc(100vh - 100px)",
             overflowY: "auto",
+            background: "var(--card)",
+            color: "var(--ink)",
+            border: "1px solid var(--hairline)",
           }}
           onClick={(e) => e.stopPropagation()}
         >
           <h1
-            style={{ fontSize: "1.35rem", fontWeight: 800, marginBottom: 24 }}
+            style={{ fontSize: "1.35rem", fontWeight: 800, marginBottom: 24, color: "var(--ink)" }}
           >
             Settings
           </h1>
@@ -184,7 +199,7 @@ export default function Settings() {
           <section style={{ marginBottom: 28 }}>
             <h2 style={sectionLabel}>Profile</h2>
             <div
-              style={{ background: "var(--bg)", borderRadius: 12, padding: 16 }}
+              className="settings-block ripple-target" style={{ background: "var(--surface-alt)", borderRadius: 14, padding: 16, color: "var(--ink)", border: "1px solid var(--hairline)" }}
             >
               <div
                 style={{
@@ -196,7 +211,7 @@ export default function Settings() {
               >
                 <div>
                   <div
-                    style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}
+                    style={{ fontSize: "0.75rem", color: "var(--muted, #66708B)" }}
                   >
                     Name
                   </div>
@@ -219,7 +234,7 @@ export default function Settings() {
               >
                 <div>
                   <div
-                    style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}
+                    style={{ fontSize: "0.75rem", color: "var(--muted, #66708B)" }}
                   >
                     Email
                   </div>
@@ -243,7 +258,7 @@ export default function Settings() {
               >
                 <div>
                   <div
-                    style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}
+                    style={{ fontSize: "0.75rem", color: "var(--muted, #66708B)" }}
                   >
                     Phone
                   </div>
@@ -265,7 +280,7 @@ export default function Settings() {
           <section style={{ marginBottom: 28 }}>
             <h2 style={sectionLabel}>Appearance</h2>
             <div
-              style={{ background: "var(--bg)", borderRadius: 12, padding: 16 }}
+              className="settings-block ripple-target" style={{ background: "var(--surface-alt)", borderRadius: 14, padding: 16, color: "var(--ink)", border: "1px solid var(--hairline)" }}
             >
               <div
                 style={{
@@ -297,7 +312,7 @@ export default function Settings() {
               <p
                 style={{
                   fontSize: "0.78rem",
-                  color: "var(--text-muted)",
+                  color: "var(--muted, #66708B)",
                   marginTop: 10,
                 }}
               >
@@ -310,7 +325,7 @@ export default function Settings() {
           <section style={{ marginBottom: 28 }}>
             <h2 style={sectionLabel}>Notifications</h2>
             <div
-              style={{ background: "var(--bg)", borderRadius: 12, padding: 16 }}
+              className="settings-block ripple-target" style={{ background: "var(--surface-alt)", borderRadius: 14, padding: 16, color: "var(--ink)", border: "1px solid var(--hairline)" }}
             >
               <div
                 style={{
@@ -325,7 +340,7 @@ export default function Settings() {
                     Push alerts
                   </div>
                   <div
-                    style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}
+                    style={{ fontSize: "0.8rem", color: "var(--muted, #66708B)" }}
                   >
                     Medium & high risk events
                   </div>
@@ -358,7 +373,7 @@ export default function Settings() {
                     display: "flex",
                     justifyContent: "space-between",
                     fontSize: "0.75rem",
-                    color: "var(--text-muted)",
+                    color: "var(--muted, #66708B)",
                   }}
                 >
                   <span>5s</span>
@@ -372,10 +387,13 @@ export default function Settings() {
           <section style={{ marginBottom: 28 }}>
             <h2 style={sectionLabel}>What we monitor</h2>
             <div
+              className="settings-block ripple-target"
               style={{
-                background: "var(--bg)",
-                borderRadius: 12,
+                background: "var(--surface-alt)",
+                borderRadius: 14,
                 padding: "4px 16px",
+                border: "1px solid var(--hairline)",
+                color: "var(--ink)",
               }}
             >
               {[
@@ -416,7 +434,7 @@ export default function Settings() {
                       {item.label}
                     </div>
                     <div
-                      style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}
+                      style={{ fontSize: "0.8rem", color: "var(--muted, #66708B)" }}
                     >
                       {item.desc}
                     </div>
@@ -462,7 +480,7 @@ export default function Settings() {
               }}
             >
               <span>🔢 Change Security PIN</span>
-              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+              <span style={{ fontSize: "0.8rem", color: "var(--muted, #66708B)" }}>
                 {showPinChange ? "▲" : "▼"}
               </span>
             </button>
@@ -489,7 +507,7 @@ export default function Settings() {
                 className="animate-in"
                 style={{
                   marginTop: 12,
-                  background: "var(--bg)",
+                  background: "var(--surface-alt)",
                   borderRadius: 12,
                   padding: 16,
                   border: "1px solid var(--border)",
@@ -571,7 +589,7 @@ export default function Settings() {
               onClick={() => setShowContact(!showContact)}
             >
               <span>📞 Contact Us</span>
-              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+              <span style={{ fontSize: "0.8rem", color: "var(--muted, #66708B)" }}>
                 {showContact ? "▲" : "▼"}
               </span>
             </button>
@@ -580,7 +598,7 @@ export default function Settings() {
                 className="animate-in"
                 style={{
                   marginTop: 12,
-                  background: "var(--bg)",
+                  background: "var(--surface-alt)",
                   borderRadius: 12,
                   padding: 16,
                   border: "1px solid var(--border)",
@@ -617,7 +635,7 @@ export default function Settings() {
                       <div
                         style={{
                           fontSize: "0.75rem",
-                          color: "var(--text-muted)",
+                          color: "var(--muted, #66708B)",
                         }}
                       >
                         Customer Care
@@ -652,7 +670,7 @@ export default function Settings() {
                       <div
                         style={{
                           fontSize: "0.75rem",
-                          color: "var(--text-muted)",
+                          color: "var(--muted, #66708B)",
                         }}
                       >
                         Email Support
@@ -864,7 +882,7 @@ export default function Settings() {
 const sectionLabel = {
   fontSize: "0.8rem",
   fontWeight: 600,
-  color: "var(--text-muted)",
+  color: "var(--muted, #66708B)",
   letterSpacing: "0.04em",
   marginBottom: 12,
   textTransform: "uppercase",
