@@ -6,12 +6,14 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, cast
+from uuid import uuid4
 
 import joblib
 import numpy as np
 import pandas as pd
 import shap
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from sklearn.ensemble import RandomForestClassifier
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,22 @@ import schemas
 from database import redis_client
 import sys
 import os
+from pathlib import Path
+
+def get_bundle_path(relative_path: str) -> Path:
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return Path(base_path) / relative_path
+
+def get_path(relative_path: str) -> str:
+    """Get absolute path to resource, works for dev and PyInstaller."""
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 # --- PyInstaller Windowed Mode Fix ---
 if sys.stdout is None:
@@ -33,6 +51,7 @@ from fastapi import FastAPI
 # ... your other imports (schemas, models, database, etc.)
 
 ml_assets: Dict[str, Any] = {}
+app_gui = None
 
 REASON_MAP = {
     "velocity_1h": "Unusual burst of transfers in the last hour",
@@ -43,7 +62,7 @@ REASON_MAP = {
 }
 
 FEATURES = list(REASON_MAP.keys())
-MODEL_PATH = Path(os.getenv("SECUREFLOW_MODEL_PATH", Path(__file__).resolve().parent / "artifacts" / "fraud_model.joblib"))
+MODEL_PATH = get_bundle_path("artifacts/fraud_model.pkl")  # Use your exact .pkl filename
 LOG_PATH = Path(os.getenv("SECUREFLOW_LOG_PATH", Path(__file__).resolve().parent / "artifacts" / "xai_events.jsonl"))
 
 
@@ -131,6 +150,146 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def _notify_gui(transaction_data: Dict[str, Any], verdict_data: Dict[str, Any]) -> None:
+    try:
+        from ui import notify_ui
+
+        notify_ui(transaction_data, verdict_data)
+    except Exception:
+        pass
+
+
+def _trigger_gui_update(transaction_data: Any, response_data: Any) -> None:
+    data = (
+        transaction_data.model_dump()
+        if hasattr(transaction_data, "model_dump")
+        else transaction_data.dict()
+        if hasattr(transaction_data, "dict")
+        else dict(transaction_data)
+    )
+    response = (
+        response_data.model_dump()
+        if hasattr(response_data, "model_dump")
+        else response_data.dict()
+        if hasattr(response_data, "dict")
+        else dict(response_data)
+    )
+    try:
+        from ui import notify_assessment
+
+        notify_assessment(data, response)
+    except Exception:
+        pass
+
+
+def _gateway_features(
+    payload: schemas.TransactionPayload, transaction_id: str
+) -> tuple[Dict[str, float], List[str]]:
+    current_time = datetime.now(timezone.utc).timestamp()
+    velocity_1h = 0.0
+    new_beneficiary = 0.0
+    reasons: List[str] = []
+
+    if redis_client is not None:
+        try:
+            velocity_key = f"gateway:{payload.sender_account}:tx_velocity"
+            redis_client.zadd(velocity_key, {transaction_id: current_time})
+            redis_client.zremrangebyscore(velocity_key, "-inf", current_time - 3600)
+            velocity_1h = float(redis_client.zcard(velocity_key))
+
+            beneficiary_key = f"gateway:{payload.sender_account}:beneficiaries"
+            new_beneficiary = float(
+                redis_client.sismember(beneficiary_key, payload.receiver_account) == 0
+            )
+            redis_client.sadd(beneficiary_key, payload.receiver_account)
+        except Exception:
+            pass
+
+    location_distance_km = (
+        999.0
+        if payload.sender_country.upper() != payload.receiver_country.upper()
+        else 0.0
+    )
+    if location_distance_km > 0:
+        reasons.append("Sender and receiver countries do not match")
+    if velocity_1h > 5:
+        reasons.append(REASON_MAP["velocity_1h"])
+    if new_beneficiary:
+        reasons.append(REASON_MAP["new_beneficiary"])
+
+    return {
+        "velocity_1h": velocity_1h,
+        "new_beneficiary": new_beneficiary,
+        "location_distance_km": location_distance_km,
+        "typing_cadence_variance": 0.0,
+        "active_screenshare": 0.0,
+    }, reasons
+
+
+@app.post("/api/evaluate", response_model=schemas.GatewayEvaluationResponse)
+async def evaluate_gateway_transaction(payload: schemas.TransactionPayload):
+    transaction_id = f"tx_{uuid4().hex}"
+    try:
+        model = ml_assets.get("model")
+        explainer = ml_assets.get("explainer")
+        features = ml_assets.get("feature_names") or FEATURES
+        feature_values, reasons = _gateway_features(payload, transaction_id)
+        input_df = pd.DataFrame(
+            {feature: [feature_values.get(feature, 0.0)] for feature in features}
+        )
+
+        risk_proba = float(model.predict_proba(input_df)[0][1]) if model else 0.0
+        impacts = (
+            _extract_feature_impacts(explainer, input_df)
+            if explainer
+            else np.zeros(len(features))
+        )
+        for index in np.argsort(impacts)[::-1]:
+            if impacts[index] > 0:
+                reason = REASON_MAP.get(features[index], features[index])
+                if reason not in reasons:
+                    reasons.append(reason)
+
+        is_fraud = (
+            risk_proba >= 0.70
+            or "Sender and receiver countries do not match" in reasons
+            or REASON_MAP["velocity_1h"] in reasons
+        )
+        response = schemas.GatewayEvaluationResponse(
+            is_fraud=is_fraud,
+            risk_score=round(risk_proba, 3),
+            action="BLOCK" if is_fraud else "ALLOW",
+            reasons=reasons or ["No significant risk indicators detected"],
+            transaction_id=transaction_id,
+        )
+        event = response.model_dump()
+        event.update(
+            {
+                "amount": payload.amount,
+                "type": "PAYMENT",
+                "nameOrig": payload.sender_account,
+                "nameDest": payload.receiver_account,
+                "status": "BLOCKED" if response.is_fraud else "APPROVED",
+                "fraud_probability": response.risk_score,
+                "reason": "; ".join(response.reasons),
+                "xai_details": response.reasons,
+            }
+        )
+        _log_xai_event({"timestamp": datetime.now(timezone.utc).isoformat(), **event})
+        _notify_gui(payload.model_dump(), response.model_dump())
+        return response
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Fraud evaluation failed: {exc}") from exc
+
 
 @app.get("/health")
 async def healthcheck() -> dict:
@@ -204,6 +363,7 @@ async def analyze_transaction(data: schemas.TransactionTelemetry):
             }
         )
 
+        _trigger_gui_update(data, response)
         return response
 
     except Exception as exc:
@@ -233,11 +393,13 @@ async def evaluate_payment(
         raise HTTPException(status_code=403, detail="Account is strictly locked due to security anomalies.")
 
     if user.trusted_device_fingerprint and user.trusted_device_fingerprint != x_device_fingerprint:
-        return schemas.EvaluateResponse(
+        response = schemas.EvaluateResponse(
             status="CHALLENGE_REQUIRED",
             action_required="STEP_UP_MFA",
             reason="Unrecognized hardware signature detected for high-value transfer.",
         )
+        _trigger_gui_update(tx, response)
+        return response
 
     # Initialize tracking defaults in case Redis is offline
     simulated_distance_km = 0.0
@@ -311,17 +473,21 @@ async def evaluate_payment(
             ]
             primary_reason = flagged_reasons[0] if flagged_reasons else "High risk indicators flagged"
 
-            return schemas.EvaluateResponse(
+            response = schemas.EvaluateResponse(
                 status="QUARANTINED",
                 action_required="TRIGGER_SHIELD_UI",
                 reason=f"Safety Lock Activated: {primary_reason}.",
                 remaining_seconds=900
             )
+            _trigger_gui_update(tx, response)
+            return response
 
-    return schemas.EvaluateResponse(
+    response = schemas.EvaluateResponse(
         status="APPROVED",
         reason="Transaction parameters standard. Payout authorized."
     )
+    _trigger_gui_update(tx, response)
+    return response
 
 
 if __name__ == "__main__":

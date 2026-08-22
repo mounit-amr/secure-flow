@@ -18,6 +18,25 @@ class TransactionRequest(BaseModel):
     current_country: str = Field(..., min_length=2, max_length=2, examples=["IN"])
 
 
+class TransactionPayload(BaseModel):
+    sender_account: str
+    receiver_account: str
+    amount: float = Field(..., gt=0.0)
+    currency: str
+    sender_country: str
+    receiver_country: str
+    device_id: str
+    session_id: str
+
+
+class GatewayEvaluationResponse(BaseModel):
+    is_fraud: bool
+    risk_score: float
+    action: str
+    reasons: List[str]
+    transaction_id: str
+
+
 
 class QuarantinedTransaction(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -43,6 +62,10 @@ class TransactionTelemetry(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     transaction_id: str = Field(..., min_length=1)
+    amount: Optional[float] = Field(None, ge=0.0)
+    currency: str = "INR"
+    sender_country: str = "IN"
+    recipient_account: str = "N/A"
     velocity_1h: float = Field(..., ge=0.0)
     new_beneficiary: int = Field(..., ge=0, le=1)
     location_distance_km: float = Field(..., ge=0.0)
